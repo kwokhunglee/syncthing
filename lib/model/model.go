@@ -2606,3 +2606,20 @@ func (s folderDeviceSet) sortedDevices(folder string) []protocol.DeviceID {
 	sort.Sort(protocol.DeviceIDs(devs))
 	return devs
 }
+
+var errNotRelative = errors.New("not a relative path")
+
+// cleanRelativePath takes a root and a supposedly relative path inside that
+// root and returns a cleaned relative path. If the relative path is not in
+// fact inside the root, an error is returned instead.
+func cleanRelativePath(root, rel string) (string, error) {
+	joined := filepath.Join(root, rel)
+	expectedPrefix := root
+	if !strings.HasSuffix(expectedPrefix, string(os.PathSeparator)) {
+		expectedPrefix += string(os.PathSeparator)
+	}
+	if !strings.HasPrefix(joined, expectedPrefix) {
+		return "", errNotRelative
+	}
+	return filepath.Rel(root, joined)
+}

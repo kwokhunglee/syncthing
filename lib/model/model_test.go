@@ -2107,6 +2107,95 @@ func TestIssue3496(t *testing.T) {
 	}
 }
 
+func TestCleanRelativePath(t *testing.T) {
+	type testcase struct {
+		root     string
+		rel      string
+		cleanRel string
+		ok       bool
+	}
+	cases := []testcase{
+		// Valid cases
+		{"foo", "bar", "bar", true},
+		{"foo", "/bar", "bar", true},
+		{"foo", "./bar", "bar", true},
+		{"foo/", "bar", "bar", true},
+		{"foo/", "/bar", "bar", true},
+		{"foo/", "./bar", "bar", true},
+		{"baz/foo", "bar", "bar", true},
+		{"baz/foo", "/bar", "bar", true},
+		{"baz/foo", "./bar", "bar", true},
+		{"baz/foo/", "bar", "bar", true},
+		{"baz/foo/", "/bar", "bar", true},
+		{"baz/foo/", "./bar", "bar", true},
+		{"foo", "bar/baz", "bar/baz", true},
+		{"foo", "/bar/baz", "bar/baz", true},
+		{"foo", "./bar/baz", "bar/baz", true},
+		{"foo/", "bar/baz", "bar/baz", true},
+		{"foo/", "/bar/baz", "bar/baz", true},
+		{"foo/", "./bar/baz", "bar/baz", true},
+		{"baz/foo", "bar/baz", "bar/baz", true},
+		{"baz/foo", "/bar/baz", "bar/baz", true},
+		{"baz/foo", "./bar/baz", "bar/baz", true},
+		{"baz/foo/", "bar/baz", "bar/baz", true},
+		{"baz/foo/", "/bar/baz", "bar/baz", true},
+		{"baz/foo/", "./bar/baz", "bar/baz", true},
+
+		// Escape attempts, should be blocked
+		{"foo", "../bar", "", false},
+		{"foo", "../foobar", "", false},
+		{"foo/", "../bar", "", false},
+		{"foo/", "../foobar", "", false},
+		{"baz/foo", "../bar", "", false},
+		{"baz/foo", "../foobar", "", false},
+		{"baz/foo/", "../bar", "", false},
+		{"baz/foo/", "../foobar", "", false},
+	}
+	if runtime.GOOS == "windows" {
+		var extraCases []testcase
+		for _, tc := range cases {
+			// Add case where root is backslashed, rel is forward slashed
+			extraCases = append(extraCases, testcase{
+				root:     filepath.FromSlash(tc.root),
+				rel:      tc.rel,
+				cleanRel: tc.cleanRel,
+				ok:       tc.ok,
+			})
+			// and the opposite
+			extraCases = append(extraCases, testcase{
+				root:     tc.root,
+				rel:      filepath.FromSlash(tc.rel),
+				cleanRel: tc.cleanRel,
+				ok:       tc.ok,
+			})
+			// and both backslashed
+			extraCases = append(extraCases, testcase{
+				root:     filepath.FromSlash(tc.root),
+				rel:      filepath.FromSlash(tc.rel),
+				cleanRel: tc.cleanRel,
+				ok:       tc.ok,
+			})
+		}
+	}
+
+	for _, tc := range cases {
+		res, err := cleanRelativePath(tc.root, tc.rel)
+		if tc.ok {
+			if err != nil {
+				t.Errorf("Unexpected error for cleanedRelativePath(%q, %q): %v", tc.root, tc.rel, err)
+				continue
+			}
+			exp := filepath.FromSlash(tc.cleanRel)
+			if res != exp {
+				t.Errorf("Unexpected result for cleanedRelativePath(%q, %q): %q != expected %q", tc.root, tc.rel, res, exp)
+			}
+		} else if err == nil {
+			t.Errorf("Unexpected pass for cleanedRelativePath(%q, %q) => %q", tc.root, tc.rel, res)
+			continue
+		}
+	}
+}
+
 func addFakeConn(m *Model, dev protocol.DeviceID) {
 	conn1 := connections.Connection{
 		IntermediateConnection: connections.IntermediateConnection{
